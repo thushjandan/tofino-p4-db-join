@@ -47,6 +47,7 @@ class DBRelation(Packet):
     name = "MYP4DB_Relation"
     fields_desc = [ 
         BitField("relationId", 0, 8),
+        BitField("joinedRelationId", 0, 8),
     ]
 
 # IP proto 250 indicates MYP4DB_Relation
@@ -89,6 +90,7 @@ def main():
         iface = get_if()
         # Send packet
         sendp(r_relation, iface=iface)
+    #return
 
     try:
         sleep(1)

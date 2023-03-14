@@ -59,7 +59,7 @@ def clear_all(verbose=True, batching=True):
 
     # The order is important. We do want to clear from the top, table entries use selector groups and selector groups use action profile members    
     for table in p4.info(return_info=True, print_info=False): # Clear Match Tables
-        if "db_join" in table['full_name']:
+        if "db_join" in table['full_name'] or "db_drop_reply" in table['full_name']:
             continue
         if table['type'] in ['MATCH_DIRECT', 'MATCH_INDIRECT_SELECTOR']:
             _clear(table, verbose=verbose, batching=batching)
