@@ -1,6 +1,4 @@
 from collections import namedtuple
-from ipaddress import ip_address
-from select import select
 
 P4_PROG = "db_join" # replace with the current P4 program
 
@@ -10,7 +8,6 @@ exec("p4 = bfrt.{prog}.pipe".format(prog=P4_PROG))  # access to the program-spec
 port = bfrt.port                                    # port management
 pre = bfrt.pre                                      # packet replication engine
 
-### ====================== DIUF-Cluster (machines connected on second network card (enp4s0f1 eth interface)) ====================== ###
 port_map = [ # port_name | mac | speed
     # Pipeline 1
     ("1/0", "00:00:00:00:00:01", "BF_SPEED_50G"),
@@ -96,11 +93,6 @@ def clear_table(table):
 print("Populating table entries")
 
 # Forward Table
-'''for switch_port in port_map:
-    if switch_port.mac == '': continue
-    
-    p4.SwitchIngress.forward.add_with_hit(dst_addr=switch_port.mac, port=get_device_port(switch_port.port_name))
-'''
 for ip_entry in ipv4_routes:
     p4.SwitchIngress.ipv4_lpm.add_with_ipv4_forward(
         hdr_ipv4_dstAddr=ip_entry["dest"],

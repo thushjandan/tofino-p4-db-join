@@ -86,7 +86,6 @@ parser SwitchIngressParser(packet_in packet,
 
     state start {
         /* TNA-specific Code for simple cases */
-        // tofino2_specs.p4
         packet.extract(ig_intr_md);
         packet.advance(PORT_METADATA_SIZE);
 
@@ -166,6 +165,7 @@ parser SwitchEgressParser(packet_in packet,
 /*************************************************************************
 **************  I N G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
+
 /*
 * Precalculates the hash value of the entryId and returns it.
 */
@@ -177,6 +177,7 @@ control calc_entryId_hash(inout headers hdr,
     Hash<hashedKey_t>(HashAlgorithm_t.CRC16) crc16Hashfct;
 
     apply {
+        // Compute hash of entryId
         hashResult = crc16Hashfct.get({ hdr.db_tuple.entryId });
     }
 }
@@ -315,7 +316,7 @@ control SwitchIngress(inout headers hdr,
 
         // Run processing for db_join only if db_relation header is present
         if (hdr.db_relation.isValid()) {
-            // Precalculate hash
+            // Precalculate hash. Result will be stored in entryIdHash
             calc_entryId_hash.apply(hdr, meta, entryIdHash);
             // Apply DB join
             db_join.apply();

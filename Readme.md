@@ -1,10 +1,10 @@
-# P4 application for table join between two relations
-This P4 application is a toy example, which implements a table join between two relations within the dataplane. BMv2 & Mininet are used to run this P4 app.
+# Intel Tofino P4 application for table join between two relations
+This P4 application is a toy example, which implements a table join between two relations within the dataplane. This P4 application has been build for the Intel Tofino Native architecture.
 
 ## Overview
 Let's assume we have two tables/relations, called `R` & `S`, and they have each three (unsigned) integer attributes.
 
-First we pump the table `R` with random numbers to the switch. The switch will store these tuples in a hash table using `extern register`.
+First we pump the table `R` with random numbers to the switch. The switch will store these tuples in a hash table using `extern Register`.
 
 Then we pump the table `S` with random numbers to the switch. The switch will recognized the table `S` and will do an INNER JOIN with table `R`.
 
@@ -31,22 +31,6 @@ Then we pump the table `S` with random numbers to the switch. The switch will re
 | 45       | 234        | 56        | 53        | 842       |
 | 789      | 685        | 145       | 74        | 315       |
 
-## How to build
-Build a vagrant box with all the necessary tools installed for P4 development using the scripts from the [p4lang/tutorials](https://github.com/p4lang/tutorials/tree/master/vm-ubuntu-20.04) repo.
-
-Afterwards, start the P4 application as follows:
-```bash
-$ make
-```
-It will build the P4 app and start mininet with 1 bmv2 switch and 2 end host.
-
-### How to stop
-First, `exit` from the mininet console and stop the app:
-```
-make stop
-# Cleanup
-make clean
-```
 
 ## Design
 After the IPv4 header, the [MYP4DB_Relation](#relational-header-myp4db_relation) header will be appended, which contains the metadata for a relation. IPv4 protocol number 0xFA (250) is used to indicate that header.
@@ -109,18 +93,14 @@ Total 20 bytes (160 bits)
 * fifthAttr (32-bit): Fifth attribute of the tuple represented as an unsigned integer.
 
 ## Example
-* Start the mininet simulator with bmv2 switch running our P4 code.
+* Start the switch simulator running our P4 code.
+* In a new terminal, execute `sniff_pkts.py` script
 ```
-make
-mininet> xterm h1 h2
+sudo python3 bfrt_python/sniff_pkts.py
 ```
-* In the terminal of h2, execute `receive.py` script
+* In a new terminal, execute `send_pkts.py` script to send requests
 ```
-h2> ./receive.py
-```
-* In the terminal of h1, send request with `send.py` script
-```
-h1> ./send.py 10.0.2.2 "P4 is cool"
+sudo python3 bfrt_python/send_pkts.py 10.0.2.2 "P4 is cool"
 ```
 
 ### Example output
@@ -406,6 +386,3 @@ As the switch holds currently tuples from the relation R with id `1`, we send tu
 ###[ Raw ]### 
                  load      = 'P4 is cool'
 ```
-
-## References
-This repository is using parts of the [p4lang/tutorials](https://github.com/p4lang/tutorials) repository to build and start the P4 application.
