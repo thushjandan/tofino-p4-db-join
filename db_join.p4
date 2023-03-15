@@ -256,7 +256,7 @@ control SwitchIngress(inout headers hdr,
         // Read entry from hash table using register action. Values are loaded into secondAttr and thirdAttr variable.
         secondAttr = db_read_action.execute(entryIdHash, thirdAttr);
 
-        // Add a new entry in reply header
+        // Add a new reply header
         hdr.db_reply_tuple.setValid();
         hdr.db_reply_tuple.entryId = hdr.db_tuple.entryId;
         hdr.db_reply_tuple.secondAttr = hdr.db_tuple.secondAttr;
