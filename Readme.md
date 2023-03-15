@@ -100,11 +100,11 @@ sudo python3 bfrt_python/sniff_pkts.py
 ```
 * In a new terminal, execute `send_pkts.py` script to send requests
 ```
-sudo python3 bfrt_python/send_pkts.py 10.0.2.2 "P4 is cool"
+sudo python3 bfrt_python/send_pkts.py
 ```
 
 ### Example output
-20 packets will be sent from h1. All the tuples in the first 10 packets will be stored in the hash table of the switch. The last 10 requests will trigger a INNER JOIN on the switch, due to a different relationId, and h2 will receive all the joined records.
+20 packets will be sent from h1 (veth1). All the tuples in the first 10 packets will be stored in the hash table of the switch. The last 10 requests will trigger a INNER JOIN on the switch, due to a different relationId, and h2 (veth17) will receive all the joined records.
 
 Long story short, all the joined tuples (INNER JOIN) can be found in the DBReplyEntry header => [see here](#retrieved-packets-on-h2).
 #### 2 samples sent by h1, which will be stored on the switch

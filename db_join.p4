@@ -16,6 +16,7 @@ const bit<8> TYPE_MYP4DB = 0xFA;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 typedef bit<32> db_attribute_t;
+// Only 10 bits width as we can store only 1024 entries in the register within the same stage.
 typedef bit<10> hashedKey_t;
 
 header ethernet_t {
@@ -190,7 +191,7 @@ control SwitchIngress(inout headers hdr,
                   inout ingress_intrinsic_metadata_for_deparser_t     ig_dprsr_md,
                   inout ingress_intrinsic_metadata_for_tm_t           ig_tm_md) {
     
-    // computed hash value of entryId will be populated.
+    // computed hash value of entryId will be stored in this variable.
     hashedKey_t entryIdHash;
 
     // Initialize hash table with value 0
@@ -252,10 +253,10 @@ control SwitchIngress(inout headers hdr,
         db_attribute_t secondAttr = 0;
         db_attribute_t thirdAttr = 0;
 
-        // Read entry from hash table using register action. Values are loaded into secondAttr and thirdAttr variable!
+        // Read entry from hash table using register action. Values are loaded into secondAttr and thirdAttr variable.
         secondAttr = db_read_action.execute(entryIdHash, thirdAttr);
 
-        // Add a new entry in reply header stack
+        // Add a new entry in reply header
         hdr.db_reply_tuple.setValid();
         hdr.db_reply_tuple.entryId = hdr.db_tuple.entryId;
         hdr.db_reply_tuple.secondAttr = hdr.db_tuple.secondAttr;
@@ -285,8 +286,8 @@ control SwitchIngress(inout headers hdr,
 
         // Prepopulate table
         const entries = {
-            (1) : insert_entry();
-            (2) : read_entry(1);
+            (1) : insert_entry();   // Relation R (relationId 1) should be stored in the hash table
+            (2) : read_entry(1);    // Relation S (relationId 2) will be joined
         }
     }
 

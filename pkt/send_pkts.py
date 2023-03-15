@@ -2,7 +2,6 @@
 #!/usr/bin/env python3
 
 import socket
-import sys
 import random
 from time import sleep
 
@@ -30,7 +29,7 @@ def get_if():
     for i in get_if_list():
         if "veth1" in i:
             iface=i
-            break;
+            break
     if not iface:
         print("Cannot find veth1 interface")
         exit(1)
@@ -69,16 +68,12 @@ def generate_db_pkt(pkt, entityId=0, pick_random_entityId=False):
     except ValueError:
         pass
         
-    pkt = pkt / UDP(dport=4321, sport=1234) / sys.argv[2]
+    pkt = pkt / UDP(dport=4321, sport=1234) / "P4 is cool"
     return pkt
 
 def main():
-
-    if len(sys.argv)<3:
-        print('pass 2 arguments: <destination> "<message>"')
-        exit(1)
     
-    addr = socket.gethostbyname(sys.argv[1])
+    addr = socket.gethostbyname("10.0.2.2")
     iface = get_if()
 
     # Generate the first relation, which will be stored on the switch
