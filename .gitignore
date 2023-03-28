@@ -14,3 +14,5 @@ logs/
 !*-runtime.json
 
 *.pcap
+
+bfruntime*pb.go
