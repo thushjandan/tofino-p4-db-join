@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -36,10 +37,10 @@ func NewTofinoDriver() TofinoDriver {
 	}
 }
 
-func (driver *TofinoDriver) Connect(host string, port int) {
+func (driver *TofinoDriver) Connect(host string, port int) error {
 	// If a connection already exists, then stop here
 	if driver.isConnected {
-		return
+		return nil
 	}
 	log.Printf("Connect to Tofino %s:%d\n", host, port)
 
@@ -49,8 +50,7 @@ func (driver *TofinoDriver) Connect(host string, port int) {
 	driver.conn, err = grpc.Dial(fmt.Sprintf("%s:%d", host, port), grpc.WithTimeout(5*time.Second), grpc.WithDefaultCallOptions(maxSizeOpt), grpc.WithInsecure(), grpc.WithBlock())
 
 	if err != nil {
-		log.Fatalf("Could not connect to Tofino %v\n", err)
-		return
+		return errors.New(fmt.Sprintf("Could not connect to Tofino %v\n", err))
 	}
 
 	log.Printf("Gen new Client with ID " + strconv.FormatUint(uint64(driver.clientId), 10))
@@ -96,9 +96,8 @@ func (driver *TofinoDriver) Connect(host string, port int) {
 	setForwardPipelineConfigResponse, err = driver.client.SetForwardingPipelineConfig(driver.ctx, &reqFPCfg)
 
 	if setForwardPipelineConfigResponse == nil || setForwardPipelineConfigResponse.GetSetForwardingPipelineConfigResponseType() != bfruntime.SetForwardingPipelineConfigResponseType_WARM_INIT_STARTED {
-		log.Printf("tofino ASIC driver: Warm Init Failed : %s", err)
 		driver.Disconnect()
-		return
+		return errors.New(fmt.Sprintf("tofino ASIC driver: Warm Init Failed : %s", err))
 	}
 
 	log.Printf("tofino ASIC driver: Warm INIT Started")
@@ -112,33 +111,32 @@ func (driver *TofinoDriver) Connect(host string, port int) {
 	getForwardPipelineConfigResponse, err = driver.client.GetForwardingPipelineConfig(driver.ctx, &reqGFPCfg)
 
 	if getForwardPipelineConfigResponse == nil {
-		log.Printf("Could not get ForwardingPipelineConfig : %s", err)
 		driver.Disconnect()
-		return
+		return errors.New(fmt.Sprintf("Could not get ForwardingPipelineConfig : %s", err))
 	}
 
 	log.Printf("Connection is ready to use")
 	// Parse BfrtInfo
 	driver.P4Tables, err = UnmarshalBfruntimeInfoJson(getForwardPipelineConfigResponse.Config[0].BfruntimeInfo)
 	if err != nil {
-		log.Printf("Could not parse P4Table BfrtInfo payload. Error: %v", err)
 		driver.Disconnect()
-		return
+		return errors.New(fmt.Sprintf("Could not parse P4Table BfrtInfo payload. Error: %v", err))
 	}
 	// Create Hash table for faster retrieval of tables
 	driver.createP4TableIndex()
 	// Parse NonP4Tables BfrtInfo
 	driver.NonP4Tables, err = UnmarshalBfruntimeInfoJson(getForwardPipelineConfigResponse.NonP4Config.BfruntimeInfo)
 	if err != nil {
-		log.Printf("Could not parse NonP4Table BfrtInfo payload. Error: %v", err)
 		driver.Disconnect()
-		return
+		return errors.New(fmt.Sprintf("Could not parse NonP4Table BfrtInfo payload. Error: %v", err))
 	}
 	// Create Hash table for faster retrieval of tables
 	driver.createNonP4TableIndex()
 
 	// Create Hash map for port cache
 	driver.portCache = make(map[string][]byte)
+
+	return nil
 }
 
 func (driver *TofinoDriver) createP4TableIndex() {
@@ -207,6 +205,21 @@ func (driver *TofinoDriver) GetDataIdByName(tblName, actionName, dataName string
 						return actionSpecObj.Data[dataIdx].Id
 					}
 				}
+			}
+		}
+	}
+	return dataId
+}
+
+func (driver *TofinoDriver) GetSingletonDataIdByName(tblName, dataName string) uint32 {
+	dataId := uint32(0)
+	// Find table name in index
+	if sliceIdx, ok := driver.indexP4Tables[tblName]; ok {
+		// Table name has been found in hash table
+		for dataIdx := range driver.P4Tables[sliceIdx].Data {
+			dataObj := driver.P4Tables[sliceIdx].Data[dataIdx]
+			if dataObj.Singleton.Name == dataName {
+				return dataObj.Singleton.Id
 			}
 		}
 	}
@@ -410,6 +423,182 @@ func (driver *TofinoDriver) AddIPv4Route(dstIpAddress net.IP, dstEtherAddress ne
 	log.Printf("A new ipv4 route has been added.")
 
 	return nil
+}
+
+func (driver *TofinoDriver) GetTupleByKeyFromDatabase(entryId uint32) (uint32, uint32, error) {
+	tblName := "pipe.SwitchIngress.database"
+	keyName := "$REGISTER_INDEX"
+	secondAttrDataName := "SwitchIngress.database.secondAttr"
+	thirdAttrDataName := "SwitchIngress.database.thirdAttr"
+	secondAttr, thirdAttr := uint32(0), uint32(0)
+	// Convert to byte slice
+	byteEntryId := make([]byte, 4)
+	binary.BigEndian.PutUint32(byteEntryId, entryId)
+
+	computedHash, err := driver.GetCRC16HashFromSwitch(entryId)
+	if err != nil {
+		return secondAttr, thirdAttr, err
+	}
+	keyValue := append([]byte{0, 0}, computedHash...)
+
+	// Send read request to switch
+	resp, err := driver.getEntityBySingleKey(tblName, keyName, keyValue)
+	if err != nil {
+		return secondAttr, thirdAttr, err
+	}
+
+	// Check if the response payload is empty
+	if len(resp) == 0 {
+		return secondAttr, thirdAttr, errors.New(fmt.Sprintf("No entry was found by the switch for %d", entryId))
+	}
+
+	// Get dataId for variable names
+	secondAttrDataId := driver.GetSingletonDataIdByName(tblName, secondAttrDataName)
+	thirdAttrDataId := driver.GetSingletonDataIdByName(tblName, thirdAttrDataName)
+	if secondAttrDataId == 0 || thirdAttrDataId == 0 {
+		return secondAttr, thirdAttr, errors.New(fmt.Sprintf("Data id for secondAttr or thirdAttr has not been found in BfrtInfo"))
+	}
+
+	respDataFields := resp[0].GetTableEntry().GetData().GetFields()
+	for _, fieldObj := range respDataFields {
+		// Parse to uint32
+		aNumber := binary.BigEndian.Uint32(fieldObj.GetStream())
+		// Assign to correct attribute
+		if fieldObj.FieldId == secondAttrDataId && aNumber != 0 {
+			secondAttr = aNumber
+		}
+		if fieldObj.FieldId == thirdAttrDataId && aNumber != 0 {
+			thirdAttr = aNumber
+		}
+	}
+
+	return secondAttr, thirdAttr, nil
+}
+
+func (driver *TofinoDriver) GetCRC16HashFromSwitch(entryId uint32) ([]byte, error) {
+	tblName := "pipe.SwitchIngress.calc_entryId_hash.crc16Hashfct.compute"
+	keyName := "hdr.db_tuple.entryId"
+	// Convert to byte slice
+	byteEntryId := make([]byte, 4)
+	binary.BigEndian.PutUint32(byteEntryId, entryId)
+
+	resp, err := driver.getEntityBySingleKey(tblName, keyName, byteEntryId)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(resp) == 0 {
+		return nil, errors.New(fmt.Sprintf("No hash was computed by the switch for %d", entryId))
+	}
+	computedHash := resp[0].GetTableEntry().GetData().GetFields()[0].GetStream()
+
+	return computedHash, nil
+}
+
+func (driver *TofinoDriver) getEntityBySingleKey(tblName, keyName string, keyValue []byte) ([]*bfruntime.Entity, error) {
+	tblId := driver.GetTableIdByName(tblName)
+	if tblId == 0 {
+		return nil, errors.New(fmt.Sprintf("Cannot find table id of %s", tblName))
+	}
+
+	keyId := driver.GetKeyIdByName(tblName, keyName)
+	if keyId == 0 {
+		return nil, errors.New(fmt.Sprintf("Cannot find key id of %s", keyName))
+	}
+
+	keyFields := []*bfruntime.KeyField{
+		{
+			FieldId: keyId,
+			MatchType: &bfruntime.KeyField_Exact_{
+				Exact: &bfruntime.KeyField_Exact{
+					Value: keyValue,
+				},
+			},
+		},
+	}
+	tblEntries := []*bfruntime.Entity{}
+
+	tblEntries = append(tblEntries,
+		&bfruntime.Entity{
+			Entity: &bfruntime.Entity_TableEntry{
+				TableEntry: &bfruntime.TableEntry{
+					TableId: tblId,
+					Value: &bfruntime.TableEntry_Key{
+						Key: &bfruntime.TableKey{
+							Fields: keyFields,
+						},
+					},
+				},
+			},
+		},
+	)
+
+	readReq := &bfruntime.ReadRequest{
+		ClientId: driver.clientId,
+		Entities: tblEntries,
+		Target: &bfruntime.TargetDevice{
+			DeviceId:  0,
+			PipeId:    0xffff,
+			PrsrId:    255,
+			Direction: 255,
+		},
+	}
+	// Send read request
+	readClient, err := driver.client.Read(driver.ctx, readReq)
+	if err != nil {
+		return nil, err
+	}
+	// Read response
+	resp, err := readClient.Recv()
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Entities, nil
+}
+
+func (driver *TofinoDriver) EnableSyncOperationOnDatabase() error {
+	tblName := "pipe.SwitchIngress.database"
+	tblId := driver.GetTableIdByName(tblName)
+	if tblId == 0 {
+		return errors.New(fmt.Sprintf("Cannot find table id of %s", tblName))
+	}
+
+	tblEntry := &bfruntime.TableOperation{
+		TableId:             tblId,
+		TableOperationsType: "Sync",
+	}
+
+	updateItems := []*bfruntime.Update{
+		{
+			Type: bfruntime.Update_INSERT,
+			Entity: &bfruntime.Entity{
+				Entity: &bfruntime.Entity_TableOperation{
+					TableOperation: tblEntry,
+				},
+			},
+		},
+	}
+
+	writeReq := bfruntime.WriteRequest{
+		ClientId:  driver.clientId,
+		Atomicity: bfruntime.WriteRequest_CONTINUE_ON_ERROR,
+		Target: &bfruntime.TargetDevice{
+			DeviceId:  0,
+			PipeId:    0xffff,
+			PrsrId:    255,
+			Direction: 255,
+		},
+		Updates: updateItems,
+	}
+
+	_, err := driver.client.Write(driver.ctx, &writeReq)
+	if err != nil {
+		log.Printf("Enable sync operation on database table failed. Error: %v", err)
+		return err
+	}
+	return nil
+
 }
 
 func (driver *TofinoDriver) Disconnect() {

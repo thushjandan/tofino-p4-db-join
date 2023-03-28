@@ -13,7 +13,11 @@ func main() {
 	port := 50052
 	driver := driver.NewTofinoDriver()
 
-	driver.Connect(host, port)
+	err := driver.Connect(host, port)
+	if err != nil {
+		log.Printf("Cannot connect to Tofino. Error: %v", err)
+		return
+	}
 	defer driver.Disconnect()
 	hwAddr, err := net.ParseMAC("00:00:00:00:00:02")
 	if err != nil {
@@ -26,4 +30,18 @@ func main() {
 	if err != nil {
 		log.Printf("Cannot add ipv4 route. Error: %v", err)
 	}
+	err = driver.EnableSyncOperationOnDatabase()
+	if err != nil {
+		log.Printf("Cannot enable sync operation. Error: %v", err)
+		return
+	}
+	// Read entryId from register
+	entryId := uint32(407)
+	secondAttr, thirdAttr, err := driver.GetTupleByKeyFromDatabase(entryId)
+	if err != nil {
+		log.Printf("Cannot find entryId %d. Error: %v", entryId, err)
+		return
+	}
+	log.Printf("Result for entryId %d is secondAttr %d and %d", entryId, secondAttr, thirdAttr)
+
 }

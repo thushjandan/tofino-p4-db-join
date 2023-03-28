@@ -17,18 +17,28 @@ type Table struct {
 	HasConstDefaultAction bool         `json:"has_const_default_action"`
 	Key                   []Field      `json:"key"`
 	ActionSpecs           []ActionSpec `json:"action_specs"`
+	Data                  []Field      `json:"data"`
 	Attributes            []string     `json:"attributes"`
 	SupportedOperations   []string     `json:"supported_operations"`
 }
 
 type Field struct {
+	Id          uint32         `json:"id"`
+	Name        string         `json:"name"`
+	Repeated    bool           `json:"repeated"`
+	Annotations []Annotation   `json:"annotations"`
+	Mandatory   bool           `json:"mandatory"`
+	MatchType   string         `json:"match_type"`
+	ReadOnly    bool           `json:"read_only"`
+	Singleton   SingletonField `json:"singleton"`
+}
+
+type SingletonField struct {
 	Id          uint32       `json:"id"`
 	Name        string       `json:"name"`
 	Repeated    bool         `json:"repeated"`
 	Annotations []Annotation `json:"annotations"`
-	Mandatory   bool         `json:"mandatory"`
-	MatchType   string       `json:"match_type"`
-	ReadOnly    bool         `json:"read_only"`
+	Type        Type         `json:"type"`
 }
 
 type Type struct {
