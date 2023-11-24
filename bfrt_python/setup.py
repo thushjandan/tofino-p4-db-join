@@ -7,7 +7,7 @@ print("Starting setup for {prog}".format(prog=P4_PROG))
 exec("p4 = bfrt.{prog}.pipe".format(prog=P4_PROG))  # access to the program-specific table config
 port = bfrt.port                                    # port management
 pre = bfrt.pre                                      # packet replication engine
-'''
+
 port_map = [ # port_name | mac | speed
     # Pipeline 1
     ("6/0", "00:00:00:00:00:01", "BF_SPEED_100G"),
@@ -15,31 +15,10 @@ port_map = [ # port_name | mac | speed
     ("8/0", "00:00:00:00:00:03", "BF_SPEED_100G"),
     ("9/0", "00:00:00:00:00:04", "BF_SPEED_100G"),
 ]
-'''
-# Physics
-port_map = [ # port_name | mac | speed
-    # Pipeline 1
-    ("25/0", "98:03:9B:97:3C:0E", "BF_SPEED_100G"),
-    ("25/2", "98:03:9B:97:3E:7E", "BF_SPEED_100G"),
-    ("25/4", "98:03:9B:97:3C:0E", "BF_SPEED_100G"),
-    ("25/6", "98:03:9B:97:3C:0E", "BF_SPEED_100G"),
-    ("1/0", "98:03:9B:67:F5:EE", "BF_SPEED_100G"),
-    ("1/2", "98:03:9B:67:F5:C6", "BF_SPEED_100G"),
-    ("1/4", "98:03:9B:67:F5:EE", "BF_SPEED_100G"),
-    ("1/6", "98:03:9B:67:F5:EE", "BF_SPEED_100G"),
-    ("9/0", "50:6B:4B:D3:D1:8C", "BF_SPEED_100G"),
-    ("9/2", "50:6B:4B:D3:D1:8C", "BF_SPEED_100G"),
-    ("9/4", "50:6B:4B:D3:D1:8C", "BF_SPEED_100G"),
-    ("9/6", "50:6B:4B:D3:D1:8C", "BF_SPEED_100G"),
-    ("17/0", "98:03:9B:97:3B:EE", "BF_SPEED_100G"),
-    ("17/2", "98:03:9B:97:38:0E", "BF_SPEED_100G"),
-    ("17/4", "98:03:9B:97:3B:EE", "BF_SPEED_100G"),
-    ("17/6", "98:03:9B:97:3B:EE", "BF_SPEED_100G"),
-]
 
 ipv4_routes = [
-        {"dest": "10.0.3.13", "length": 32, "dest_mac": "98:03:9B:97:3C:0E", "port": "25/0"},
-        {"dest": "10.0.3.14", "length": 32, "dest_mac": "98:03:9B:97:3E:7E", "port": "25/2"}
+        {"dest": "10.0.3.13", "length": 32, "dest_mac": "00:00:00:00:00:01", "port": "6/0"},
+        {"dest": "10.0.3.14", "length": 32, "dest_mac": "00:00:00:00:00:02", "port": "7/0"}
 ]
 
 SwitchPort = namedtuple("SwitchPort", [ "port_name", "mac", "speed" ])
